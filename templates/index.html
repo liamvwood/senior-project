@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+
+<head>
+    <script src="//code.jquery.com/jquery-2.2.1.min.js"></script>
+    <script src="//netdna.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
+    <script src="//ajax.googleapis.com/ajax/libs/angularjs/1.4.5/angular.min.js"></script>
+    <script src="{{ url_for('static', filename='main.js') }}"></script>
+</head>
+
+<body ng-app="BlockchainApp" ng-controller="mainController">
+    <div>
+        <button ng-click="getChain()">Get Chain</button>
+        <button ng-click="mine()">Mine</button>
+        <input id="node">
+        <button ng-click="register()">Register</button>
+        <button ng-click="resolve()">Resolve</button>
+        <label>Sender</label>
+        <input id='sender'>
+        <label>Recipient</label>
+        <input id='recipient'>
+        <label>Amount</label>
+        <input id='amount'>
+        <button ng-click="newTransaction()">Send</button>
+    </div>
+    <div>
+        <p id="dump"></p>
+    </div>
+</body>
