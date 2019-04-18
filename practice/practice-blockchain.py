@@ -12,6 +12,9 @@ class Blockchain(object):
     def __init__(self):
         self.chain = []
         self.nodes = set()
+
+        # current origin node for getting onto the network
+        self.nodes.add("192.168.0.156:5000")
         self.current_transactions = []
 
         # I haven't settled on a proof yet, looking into proof of stake
@@ -96,6 +99,8 @@ class Blockchain(object):
     
     def new_transaction(self, sender, recipient, amount):
         # this method should create a new transacation and add it to the current_transactions
+
+        # need to add a way to verify transactions
 
         self.current_transactions.append({
             'sender': sender,
