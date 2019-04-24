@@ -15,22 +15,31 @@ from urllib.parse import urlparse
 
 
 from blockchain import Blockchain
-from transaction import Transaction
+from transaction import Transaction, Investment
 
 import binascii
 import Cryptodome
-from Cryptodome.PublicKey import RSA
+from Cryptodome.PublicKey import ECC
+from flask_cors import CORS
+
+MINING_SENDER = 0
+
 
 ### Setting up our Blockchain as an API with Flask ###
 
 # Instantiate our Flask Node
 app = Flask(__name__)
 
-# Create a unique global address
-node_indentifier = str(uuid4()).replace('-','')
-
 # Instantiate our blockchain
 blockchain = Blockchain()
+
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    return render_template('index.html')
+
+@app.route('/configure', methods=['GET', 'POST'])
+def configure():
+    return render_template('configure.html')
 
 @app.route('/make/transaction')
 def make_transaction():
@@ -43,33 +52,14 @@ def view_transaction():
 @app.route('/wallet/new', methods=['GET'])
 def new_wallet():
 	random_gen = Cryptodome.Random.new().read
-	private_key = RSA.generate(1024, random_gen)
-	public_key = private_key.publickey()
+	private_key = ECC.generate(curve='P-256')
+	public_key = private_key.public_key()
 	response = {
-		'private_key': binascii.hexlify(private_key.exportKey(format='DER')).decode('ascii'),
-		'public_key': binascii.hexlify(public_key.exportKey(format='DER')).decode('ascii')
+		'private_key': binascii.hexlify(private_key.export_key(format='DER')).decode('ascii'),
+		'public_key': binascii.hexlify(public_key.export_key(format='DER')).decode('ascii')
 	}
 
 	return jsonify(response), 200
-
-@app.route('/generate/transaction', methods=['POST'])
-def generate_transaction():
-	
-	sender_address = request.form['sender_address']
-	sender_private_key = request.form['sender_private_key']
-	recipient_address = request.form['recipient_address']
-	value = request.form['amount']
-
-	transaction = Transaction(sender_address, sender_private_key, recipient_address, value)
-
-	response = {'transaction': transaction.to_dict(), 'signature': transaction.sign_transaction()}
-
-	return jsonify(response), 200
-
-
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    return render_template('index.html')
 
 @app.route('/mine', methods=['GET'])
 def mine():
@@ -80,11 +70,7 @@ def mine():
 
     # We doll out the reward for mining the block here
     # And we represent the sender as "0" which refers to the current node as the miner
-    blockchain.new_transaction(
-        sender="0",
-        recipient=node_indentifier,
-        amount=1
-    )
+    blockchain.submit_transaction(sender_address=MINING_SENDER, recipient_address=blockchain.node_id, value=1, signature="")
 
     # Now create the new block on the blockchain
     previous_hash= blockchain.hash(last_block)
@@ -99,28 +85,85 @@ def mine():
     }
     return jsonify(response), 200
 
+@app.route('/generate/investment', methods=['POST'])
+def generate_investment():
+    values = request.get_json()
+
+    sender_address = values['sender_address']
+    sender_private_key = values['sender_private_key']
+    recipient_address = values['recipient_address']
+    value = values['amount']
+    url = values['url']
+
+    investment = Investment(sender_address, sender_private_key, recipient_address, value, url)
+
+    response = {'transaction': investment.to_dict(), 'signature': investment.sign_transaction()}
+
+    return jsonify(response), 200
+
+@app.route('/investments/new', methods=['POST'])
+def new_investment():
+    values = request.get_json()
+    # Check that the required fields are in the POST'ed data
+    required = ['sender_address', 'recipient_address', 'amount', 'signature', 'url']
+    if not all(k in values for k in required):
+        return 'Missing values', 400
+    # Create a new Transaction
+    transaction_result = blockchain.submit_transaction(values['sender_address'], values['recipient_address'], values['amount'], values['signature'], url=values['url'])
+
+    if transaction_result == False:
+        response = {'message': 'Invalid Transaction!'}
+        return jsonify(response), 406
+    else:
+        response = {'message': 'Investment will be added to Block '+ str(transaction_result)}
+        return jsonify(response), 201
+
+@app.route('/generate/transaction', methods=['POST'])
+def generate_transaction():
+    values = request.get_json()
+
+    sender_address = values['sender_address']
+    sender_private_key = values['sender_private_key']
+    recipient_address = values['recipient_address']
+    value = values['amount']
+
+    transaction = Transaction(sender_address, sender_private_key, recipient_address, value)
+
+    response = {'transaction': transaction.to_dict(), 'signature': transaction.sign_transaction()}
+
+    return jsonify(response), 200
+
 @app.route('/transactions/new', methods=['POST'])
 def new_transaction():
     values = request.get_json()
 
-    # validate the request
-    required_fields = ['sender', 'recipient', 'amount']
-    if not all(k in values for k in required_fields):
+    # Check that the required fields are in the POST'ed data
+    required = ['sender_address', 'recipient_address', 'amount', 'signature']
+    if not all(k in values for k in required):
         return 'Missing values', 400
-    
-    # Otherwise, create the new transaction here
-    index = blockchain.new_transaction(values['sender'], values['recipient'], values['amount'])
+    # Create a new Transaction
+    transaction_result = blockchain.submit_transaction(values['sender_address'], values['recipient_address'], values['amount'], values['signature'])
 
-    response = {
-        'message': f'Transaction is being added to Block {index}'
-        }
-    return jsonify(response), 201
+    if transaction_result == False:
+        response = {'message': 'Invalid Transaction!'}
+        return jsonify(response), 406
+    else:
+        response = {'message': 'Transaction will be added to Block '+ str(transaction_result)}
+        return jsonify(response), 201
 
 @app.route('/chain', methods=['GET'])
 def full_chain():
     response = {
         'chain': blockchain.chain,
         'length': len(blockchain.chain)
+    }
+    return jsonify(response), 200
+
+@app.route('/nodes/get', methods=['GET'])
+def get_nodes():
+    nodes = list(blockchain.nodes)
+    response = {
+        'nodes': nodes
     }
     return jsonify(response), 200
 
@@ -158,4 +201,4 @@ def consensus():
     return jsonify(response), 200
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000, debug=True)

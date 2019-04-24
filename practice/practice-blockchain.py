@@ -97,18 +97,37 @@ class Blockchain(object):
 
         return block
     
-    def new_transaction(self, sender, recipient, amount):
-        # this method should create a new transacation and add it to the current_transactions
+ def verify_transaction_signature(self, sender_address, signature, transaction):
+        """
+        Check that the provided signature corresponds to transaction
+        signed by the public key (sender_address)
+        """
+        public_key = RSA.importKey(binascii.unhexlify(sender_address))
+        verifier = PKCS1_v1_5.new(public_key)
+        h = SHA.new(str(transaction).encode('utf8'))
+        return verifier.verify(h, binascii.unhexlify(signature))
 
-        # need to add a way to verify transactions
 
-        self.current_transactions.append({
-            'sender': sender,
-            'recipient': recipient,
-            'amount': amount
-        })
+    def submit_transaction(self, sender_address, recipient_address, value, signature):
+        """
+        Add a transaction to transactions array if the signature verified
+        """
+        transaction = OrderedDict({'sender_address': sender_address, 
+                                    'recipient_address': recipient_address,
+                                    'value': value})
 
-        return self.last_block['index'] + 1
+        #Reward for mining a block
+        if sender_address == MINING_SENDER:
+            self.transactions.append(transaction)
+            return len(self.chain) + 1
+        #Manages transactions from wallet to another wallet
+        else:
+            transaction_verification = self.verify_transaction_signature(sender_address, signature, transaction)
+            if transaction_verification:
+                self.transactions.append(transaction)
+                return len(self.chain) + 1
+            else:
+                return False
 
     @staticmethod
     def hash(block):
