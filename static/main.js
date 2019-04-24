@@ -42,6 +42,18 @@ angular.module('BlockchainApp').factory('blockchainFactory', function ($http) {
     }
     return methods;
 })
+function findWalletBalance(address, transactions) {
+    var current_balance = 0
+    for (let i = 0; i < transactions.length; i++) {
+        if (transactions[i].recipient_address == address) {
+            current_balance++
+        }
+        if (transactions[i].sender_address == address) {
+            current_balance--
+        }
+    }
+    return current_balance
+}
 
 function myAlertTop() {
     $(".myAlert-top").show();
@@ -206,6 +218,18 @@ angular.module('BlockchainApp').controller('mainController', function (blockchai
             });
     }
     $scope.transactions = []
+    blockchainFactory.getChain()
+        .then(function (res) {
+            $scope.chain = res.data['chain']
+            var length = res.data['length']
+            var transactions = []
+            for (i = 1; i < length; i++) {
+                for (j = 0; j < $scope.chain[i]["transactions"].length; j++) {
+                    transactions.push($scope.chain[i]["transactions"][j]);
+                }
+            }
+            $scope.all_transactions = transactions
+        })
     $scope.investments = []
 
     $scope.changeTableView = function (selection) {
@@ -235,7 +259,6 @@ angular.module('BlockchainApp').controller('mainController', function (blockchai
                     $scope.transactions = transactions
                     $scope.table_content = 'transactions'
                 })
-
         }
         else if (selection == 'investments') {
             dropdownEl.innerHTML = 'Investments'
@@ -285,7 +308,7 @@ angular.module('BlockchainApp').controller('mainController', function (blockchai
         }
         $("#collapse1").collapse('toggle')
     }
-    $scope.generateInvestment = function(investment_address) {
+    $scope.generateInvestment = function (investment_address) {
         let recipient = document.getElementById('recipient_address')
         recipient.value = investment_address
         if ($("#collapse2").attr("aria-expanded")) {
@@ -293,4 +316,10 @@ angular.module('BlockchainApp').controller('mainController', function (blockchai
         }
         $("#collapse1").collapse('show')
     }
+
+    var wallet_balance = document.getElementById('wallet_balance')
+    $('#input_wallet_balance').on('input', function (e) {
+        var wallet_address = document.getElementById('input_wallet_balance').value
+        wallet_balance.innerHTML = `${findWalletBalance(wallet_address, $scope.all_transactions)} RBC`
+    });
 })

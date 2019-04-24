@@ -13,12 +13,32 @@
 </head>
 
 <body ng-app="BlockchainApp" ng-controller="mainController">
+    <nav class="navbar bg-primary" style="border-radius: 0px;">
+        <div class="container-fluid">
+            <!-- Brand and toggle get grouped for better mobile display -->
+            <div class="navbar-header">
+                <a class="navbar-brand" href="#" style="color: white;">Reddit Bets</a>
+            </div>
+
+            <!-- Collect the nav links, forms, and other content for toggling -->
+            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                <form class="navbar-form navbar-right">
+                    <div class="input-group" style="width:344px"> 
+                        <input type="text" class="form-control" id="input_wallet_balance" placeholder="Enter Public Key">
+                        <span class="input-group-addon" id="wallet_balance">-- RBC</span>
+                        </span>
+                    </div>
+
+                </form>
+            </div><!-- /.navbar-collapse -->
+        </div><!-- /.container-fluid -->
+    </nav>
     <div class="myAlert-top alert alert-success">
         <a href="#" class="close" data-dismiss="alert" aria-label="close">&times;</a>
         <strong>Success!</strong> Your transaction is being added to the blockchain!
     </div>
     <div class="container">
-        <div class="row justify-content-center row-eq-height" style="margin-top:5%">
+        <div class="row justify-content-center row-eq-height">
             <div class="col-md-6" style="border-right: solid lightgrey 1px">
                 <div class="jumbotron"
                     style="padding:5%; box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);">
@@ -272,8 +292,7 @@
                         <div class="col-sm-3">
                             <div class="dropdown">
                                 <button class="btn btn-primary dropdown-toggle" type="button" id="dropdown-button"
-                                    data-toggle="dropdown"
-                                    style="text-overflow: ellipsis;overflow: hidden; max-width:100px">
+                                    data-toggle="dropdown" style="text-overflow: ellipsis;overflow: hidden;">
                                     <span id="dropdown-text">Browser</span>
                                     <span class="caret"></span>
                                 </button>
@@ -286,7 +305,8 @@
                         </div>
                         <div class="col-sm-9">
                             <div class="input-group" id="searchBar">
-                                <span class="input-group-addon" id="sizing-addon1"><span class="glyphicon glyphicon-search"></span>
+                                <span class="input-group-addon" id="sizing-addon1"><span
+                                        class="glyphicon glyphicon-search"></span>
                                 </span>
                                 <input type="text" ng-model="search" class="form-control" placeholder="Search...">
                             </div>
@@ -297,13 +317,12 @@
                             <tr ng-if="table_content === 'investments'"
                                 ng-repeat="investment in investments | filter: search | orderBy: $index">
                                 <td aria-expanded="false" aria-controls="collapseExample" style="padding: 0px">
-                                    <h4 style="padding: 18px; margin:0px" data-toggle="collapse"
+                                    <h4 style="padding: 18px; margin:0px;" data-toggle="collapse"
                                         data-target="#collapseExample{[$index]}">Investment {[$index]}</h4>
                                     <div class="collapse" id="collapseExample{[$index]}">
                                         <div class="card card-body" style="margin-left: 18px">
-                                            <label>This Investment's Address</label>
-                                            <p href="#" ng-click="generateInvestment(investment['recipient_address'])">
-                                                {[investment['recipient_address']]}</p>
+                                            <label>This Investment's Address <span class="glyphicon glyphicon-send" style="margin: 2px 0px 0px 4px; float:right" ng-click="generateInvestment(investment['recipient_address'])"></span></label>
+                                            <p>{[investment['recipient_address']]}</p>
                                             <label>Url</label>
                                             <div style="margin-bottom: 15px">
                                                 <a style="font-size:16px" href="{[investment['url']]}"
@@ -317,12 +336,12 @@
                             </tr>
                             <tr ng-if="table_content === 'transactions'"
                                 ng-repeat="transaction in transactions | filter: search | orderBy: $index">
-                                <td data-toggle="collapse" data-target="#collapseExample{[$index]}"
-                                    aria-expanded="false" aria-controls="collapseExample">
-                                    <h4>Transaction {[$index]}</h4>
+                                <td aria-expanded="false" aria-controls="collapseExample" style="padding: 0px">
+                                    <h4 style="padding: 18px; margin:0px" data-toggle="collapse"
+                                    data-target="#collapseExample{[$index]}">Transaction {[$index]}</h4>
                                     <div class="collapse" id="collapseExample{[$index]}">
-                                        <div class="card card-body">
-                                            <label>Recipient's Address</label>
+                                        <div class="card card-body" style="margin-left: 18px">
+                                            <label>Recipient's Address <span class="glyphicon glyphicon-send" style="margin: 2px 0px 0px 4px; float:right" ng-click="generateInvestment(transaction['recipient_address'])"></span></label>
                                             <p>{[transaction['recipient_address']]}</p>
                                             <label>Sender's Address</label>
                                             <p>{[transaction['sender_address']]}</p>
