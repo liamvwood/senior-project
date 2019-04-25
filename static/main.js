@@ -46,10 +46,10 @@ function findWalletBalance(address, transactions) {
     var current_balance = 0
     for (let i = 0; i < transactions.length; i++) {
         if (transactions[i].recipient_address == address) {
-            current_balance++
+            current_balance += transactions[i].value
         }
         if (transactions[i].sender_address == address) {
-            current_balance--
+            current_balance -= transactions[i].value
         }
     }
     return current_balance
