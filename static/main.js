@@ -27,8 +27,8 @@ angular.module('BlockchainApp').factory('blockchainFactory', function ($http) {
         createTransaction: function (sender, recipient, amount, private_key) {
             return $http.post('/generate/transaction', { 'sender_address': sender, 'sender_private_key': private_key, 'recipient_address': recipient, 'amount': amount })
         },
-        submitTransaction: function (sender, recipient, amount, signature) {
-            return $http.post('/transactions/new', { 'sender_address': sender, 'signature': signature, 'recipient_address': recipient, 'amount': amount })
+        submitTransaction: function (sender, transaction, signature) {
+            return $http.post('/transactions/new', {'sender_address': sender,'signature': signature, 'transaction': transaction })
         },
         createInvestment: function (sender, recipient, amount, private_key, url) {
             return $http.post('/generate/investment', { 'sender_address': sender, 'sender_private_key': private_key, 'recipient_address': recipient, 'amount': amount, 'url': url })
@@ -38,22 +38,18 @@ angular.module('BlockchainApp').factory('blockchainFactory', function ($http) {
         },
         getRedditJSON: function (url) {
             return $http.get(url)
+        },
+        computeBalance: function (address) {
+            return $http.post('/balance', {'address': address})
         }
     }
     return methods;
 })
-function findWalletBalance(address, transactions) {
-    var current_balance = 0
-    for (let i = 0; i < transactions.length; i++) {
-        if (transactions[i].recipient_address == address) {
-            current_balance += transactions[i].value
-        }
-        if (transactions[i].sender_address == address) {
-            current_balance -= transactions[i].value
-        }
-    }
-    return current_balance
-}
+
+// function findWalletBalance(address) {
+//     computeBalance
+//     return current_balance
+// }
 
 function myAlertTop() {
     $(".myAlert-top").show();
@@ -82,6 +78,7 @@ function traverse(jsonObj) {
 
 angular.module('BlockchainApp').controller('mainController', function (blockchainFactory, $http, $scope) {
     $scope.chain = []
+    $scope.transactionToSubmit = {}
     $scope.table_content = 'blockchain'
     blockchainFactory.getChain()
         .then(function (res) {
@@ -91,11 +88,13 @@ angular.module('BlockchainApp').controller('mainController', function (blockchai
     $scope.createWallet = function () {
         let private_key_text = document.getElementById('private_key')
         let public_key_text = document.getElementById('public_key')
+        let public_address_text = document.getElementById('public_address')
 
         blockchainFactory.createWallet()
             .then(function (res) {
                 private_key_text.value = res.data['private_key']
                 public_key_text.value = res.data['public_key']
+                public_address_text.value = res.data['public_address']
             })
     }
     $scope.mine = function () {
@@ -131,11 +130,12 @@ angular.module('BlockchainApp').controller('mainController', function (blockchai
 
         blockchainFactory.createTransaction(sender, recipient, amount, private_key)
             .then(function (res) {
+                console.log(res)
                 signature = res.data['signature']
-                transaction = res.data['transaction']
-                confirmation_sender.value = transaction['sender_address']
-                confirmation_recipient.value = transaction['recipient_address']
-                confirmation_amount.value = transaction['value']
+                $scope.transactionToSubmit = res.data['transaction']
+                confirmation_sender.value = res.data['sender_address']
+                confirmation_recipient.value = res.data['recipient_address']
+                confirmation_amount.value = res.data['amount']
                 transaction_signature.value = signature
             })
             .catch(function (err) {
@@ -194,7 +194,8 @@ angular.module('BlockchainApp').controller('mainController', function (blockchai
         let recipient = document.getElementById('confirmation_recipient_address').value
         let amount = document.getElementById('confirmation_amount').value
         let signature = document.getElementById('transaction_signature').value
-        blockchainFactory.submitTransaction(sender, recipient, amount, signature)
+
+        blockchainFactory.submitTransaction(sender, $scope.transactionToSubmit, signature)
             .then(function (res) {
                 if (res.status == 201) {
                     $('#transactionModal').modal('hide')
@@ -318,8 +319,10 @@ angular.module('BlockchainApp').controller('mainController', function (blockchai
     }
 
     var wallet_balance = document.getElementById('wallet_balance')
-    $('#input_wallet_balance').on('input', function (e) {
+    $('#input_wallet_balance').on('input', async function (e) {
         var wallet_address = document.getElementById('input_wallet_balance').value
-        wallet_balance.innerHTML = `${findWalletBalance(wallet_address, $scope.all_transactions)} RBC`
+        await blockchainFactory.computeBalance(wallet_address).then((response)=> {
+            wallet_balance.innerHTML = `${response.data.balance} RBC`
+        })
     });
 })

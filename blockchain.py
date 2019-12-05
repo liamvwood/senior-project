@@ -17,27 +17,38 @@ import requests
 from flask import Flask, jsonify, request, render_template
 from urllib.parse import urlparse
 
-from transaction import Transaction
+from transaction import Transaction, TransactionInput, compute_balance
+from block import Block, GenesisBlock
+from wallet import Wallet
+
 
 class Blockchain(object):
     def __init__(self):
         self.chain = []
         self.nodes = set()
-        # Create a unique global address
-        private_key = ECC.generate(curve='P-256')
-        public_key = private_key.public_key()
+
+        self.wallet = Wallet()
+
+        # Store this nodes keys for "safe" keeping
         file_out = open("private.txt", "w")
-        file_out.write(binascii.hexlify(private_key.export_key(format='DER')).decode('ascii'))
+        file_out.write(binascii.hexlify(
+            self.wallet._private_key.export_key(format='DER')).decode('ascii'))
 
         file_out = open("receiver.txt", "w")
-        file_out.write(binascii.hexlify(public_key.export_key(format='DER')).decode('ascii'))
-
-        self.node_id = binascii.hexlify(public_key.export_key(format='DER')).decode('ascii')
+        file_out.write(binascii.hexlify(
+            self.wallet._public_key.export_key(format='DER')).decode('ascii'))
 
         self.transactions = []
 
         # I haven't settled on a proof yet, looking into proof of stake
-        self.new_block(previous_hash=1, proof=100)
+        self.new_block()
+
+    def serialize_chain(self):
+        serialized_chain = []
+        for block in self.chain:
+            serialized_chain.append(block.to_dict())
+
+        return serialized_chain
 
     def register_node(self, address):
         # Adds a new node to the set of nodes
@@ -96,15 +107,22 @@ class Blockchain(object):
 
         return False
 
-    def new_block(self, proof, previous_hash=None):
+    def new_block(self, previous_block=None):
         # this method should create a new block and add it to the chain
-        block = {
-            'index': len(self.chain) + 1,
-            'timestamp': time(),
-            'transactions': self.transactions,
-            'proof': proof,
-            'previous_hash': previous_hash or self.hash(self.chain[-1])
-        }
+
+        if not previous_block:
+            block = GenesisBlock(self.wallet.address)
+        else:
+            block = Block(self.transactions, previous_block,
+                          self.wallet.address)
+
+        # block = {
+        #     'index': len(self.chain) + 1,
+        #     'timestamp': time(),
+        #     'transactions': self.transactions,
+        #     'proof': proof,
+        #     'previous_hash': previous_hash or self.hash(self.chain[-1])
+        # }
 
         # Clear transactions on creation of new block
         self.transactions = []
@@ -114,53 +132,96 @@ class Blockchain(object):
 
         return block
 
-
     def verify_transaction_signature(self, sender_address, signature, transaction):
         """
         Check that the provided signature corresponds to transaction
         signed by the public key (sender_address)
         """
-        public_key = ECC.import_key(binascii.unhexlify(sender_address))
-        verifier = DSS.new(public_key, 'fips-186-3')
-        h = SHA256.new(str(transaction).encode('utf8'))
+        pubkey = ECC.import_key(binascii.unhexlify(sender_address))
+        verifier = DSS.new(pubkey, 'fips-186-3')
+        h = SHA256.new(transaction.encode('utf8'))
         try:
             verifier.verify(h, binascii.unhexlify(signature))
             return True
         except ValueError:
             print('this signature is NOT authentic')
             return False
-        # return verifier.verify(h, binascii.unhexlify(signature))
 
-
-    def submit_transaction(self, sender_address, recipient_address, value, signature, url=None):
+    def submit_transaction(self, sender_address, transaction, signature, url=None):
         """
         Add a transaction to transactions array if the signature verified
         """
-        if url == None:
-            transaction = OrderedDict({'sender_address': sender_address,
-                                    'recipient_address': recipient_address,
-                                    'value': value
-                                    })
-        else:
-            transaction = OrderedDict({'sender_address': sender_address,
-                                    'recipient_address': recipient_address,
-                                    'value': value,
-                                    'url': url
-                                    })
-        #Reward for mining a block
-        if sender_address == 0:
+        # if url == None:
+        #     transaction = OrderedDict({'sender_address': sender_address,
+        #                                'recipient_address': recipient_address,
+        #                                'value': value
+        #                                })
+        # else:
+        #     transaction = OrderedDict({'sender_address': sender_address,
+        #                                'recipient_address': recipient_address,
+        #                                'value': value,
+        #                                'url': url
+        #                                })
+        # Manages transactions from wallet to another wallet
+        transaction_verification = self.verify_transaction_signature(sender_address, signature, transaction)
+        if transaction_verification:
             self.transactions.append(transaction)
             return len(self.chain) + 1
-        #Manages transactions from wallet to another wallet
         else:
-            transaction_verification = self.verify_transaction_signature(
-                sender_address, signature, transaction)
-            if transaction_verification:
-                self.transactions.append(transaction)
-                return len(self.chain) + 1
-            else:
-                return False
+            return False
 
+    def find_balance(self, address):
+        balance = 0
+        # parse the entire blockchain for transactions with address as recipient
+        for block in self.chain:
+            balance += compute_balance(address, block.get_transactions())
+
+        # parse the current list of transactions
+        balance += compute_balance(address, self.transactions)
+
+        return balance
+
+    @staticmethod
+    def search_block_for_address(block, address):
+        outputs = []
+        for transaction in block.get_transactions():
+            for i in range(len(transaction.outputs)):
+                if transaction.outputs[i].recipient == address:
+                    outputs.append((transaction, i))
+
+        return outputs
+
+    def get_transaction_inputs(self, address, amount):
+        chosen_inputs = []
+        potential_inputs = []
+
+        for block in self.chain:
+            potential_inputs = self.search_block_for_address(block, address)
+
+        if len(potential_inputs) == 0:
+            return None
+
+        sum_chosen_inputs = 0
+
+        while (sum_chosen_inputs < amount and len(potential_inputs) > 0):
+            max_value = potential_inputs[0][0].outputs[potential_inputs[0][1]].amount
+            max_pos = 0
+
+            for i in range(1, len(potential_inputs)):
+                if max_value < potential_inputs[i][0].outputs[potential_inputs[i][1]].amount:
+                    max_value = potential_inputs[i][0].outputs[potential_inputs[i][1]].amount
+                    max_pos = 0
+
+            chosen_inputs.append(potential_inputs[max_pos])
+            sum_chosen_inputs += max_value
+            potential_inputs.pop(max_pos)
+
+        input_transactions = []
+
+        for _input in chosen_inputs:
+            input_transactions.append(TransactionInput(_input[0], _input[1]))
+
+        return input_transactions
 
     @staticmethod
     def hash(block):

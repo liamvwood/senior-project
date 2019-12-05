@@ -1,0 +1,39 @@
+generate/transaction:
+{
+    'sender_address': PublicKey(String),
+    'sender_private_key: PrivateKey(String),
+    'recipient_address': PublicKey(String),
+    'value': Integer
+}
+
+new/transaction:
+{
+    'transaction':
+    {
+        'sender_address': PublicKey(String),
+        'recipient_address': PublicKey(String),
+        'value': Integer
+    },
+    'signature': Signature(String)
+}
+
+generate/wallet:
+{
+    'private_key': PrivateKey(String),
+    'public_key': PublicKey(String)
+}
+
+Transaction:
+{
+    'sender_address': PublicKey(String),
+    'recipient_address': PublicKey(String),
+    'value': Integer
+}
+
+Investment: 
+{
+    'sender_address': PublicKey(String),
+    'recipient_address': PublicKey(String),
+    'value': Integer,
+    'url': URL(String)
+}
